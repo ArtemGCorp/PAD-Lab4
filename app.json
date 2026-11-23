@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "Курсы НБМ",
+    "slug": "bnm-rates-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": { "supportsTablet": true, "bundleIdentifier": "md.pad.lab4" },
+    "android": { "package": "md.pad.lab4" }
+  }
+}
