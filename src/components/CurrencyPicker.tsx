@@ -10,9 +10,10 @@ interface Props {
   options: string[];
   names?: Record<string, string>;
   onChange: (code: string) => void;
+  testID?: string;
 }
 
-export function CurrencyPicker({ label, value, options, names, onChange }: Props) {
+export function CurrencyPicker({ label, value, options, names, onChange, testID }: Props) {
   const [open, setOpen] = useState(false);
   const disabled = options.length === 0;
   return (
@@ -21,11 +22,15 @@ export function CurrencyPicker({ label, value, options, names, onChange }: Props
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${value}`}
+        testID={testID}
         disabled={disabled}
         onPress={() => setOpen(true)}
         style={[styles.button, disabled && { opacity: 0.5 }]}
       >
-        <Text style={styles.code}>{value || '—'}</Text>
+        <View>
+          <Text style={styles.code}>{value || '—'}</Text>
+          {names?.[value] ? <Text style={styles.name} numberOfLines={1}>{names[value]}</Text> : null}
+        </View>
         <Text style={styles.chevron}>▾</Text>
       </Pressable>
       <Modal visible={open} animationType="slide" onRequestClose={() => setOpen(false)}>
@@ -41,6 +46,7 @@ export function CurrencyPicker({ label, value, options, names, onChange }: Props
             keyExtractor={(c) => c}
             renderItem={({ item }) => (
               <Pressable
+                testID={`option-${item}`}
                 style={[styles.row, item === value && styles.rowActive]}
                 onPress={() => {
                   onChange(item);
@@ -67,12 +73,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
+    borderRadius: 12,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: colors.card,
+    paddingVertical: 10,
+    backgroundColor: colors.bg,
+    minHeight: 56,
   },
-  code: { fontSize: 18, fontWeight: '600', color: colors.text },
+  code: { fontSize: 18, fontWeight: '700', color: colors.text },
+  name: { fontSize: 12, color: colors.muted, maxWidth: 110 },
   chevron: { color: colors.muted, fontSize: 16 },
   modal: { flex: 1, backgroundColor: colors.bg },
   header: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, alignItems: 'center' },
@@ -86,7 +94,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     backgroundColor: colors.card,
   },
-  rowActive: { backgroundColor: '#E8F0FE' },
+  rowActive: { backgroundColor: colors.primarySoft },
   rowCode: { width: 56, fontWeight: '600', color: colors.text, fontSize: 16 },
   rowName: { color: colors.muted, fontSize: 15, flex: 1 },
 });

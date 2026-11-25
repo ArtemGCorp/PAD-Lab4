@@ -3,13 +3,17 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View }
 
 import { LineChart } from '../components/LineChart';
 import { Notice } from '../components/Notice';
+import { ScreenHeader } from '../components/ScreenHeader';
 import { SOURCE_NAME } from '../lib/bnm';
 import { formatAmount } from '../lib/money';
 import { HistoryResult } from '../lib/repository';
 import { seriesFor } from '../lib/series';
-import { computeStats, TREND_LABEL } from '../lib/stats';
+import { computeStats, Trend, TREND_LABEL } from '../lib/stats';
 import { useAppState } from '../state';
 import { card, colors } from '../theme';
+
+const TREND_ICON: Record<Trend, string> = { up: '▲', down: '▼', flat: '■' };
+const TREND_SOFT: Record<Trend, string> = { up: colors.upSoft, down: colors.downSoft, flat: colors.flatSoft };
 
 export function AnalyticsScreen({ days, title }: { days: number; title: string }) {
   const { repo, from, to } = useAppState();
@@ -47,58 +51,70 @@ export function AnalyticsScreen({ days, title }: { days: number; title: string }
 
   return (
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={styles.scroll}
       refreshControl={<RefreshControl refreshing={loading && !!history} onRefresh={load} />}
     >
-      <Text style={styles.h1}>{title}</Text>
-      <Text style={styles.pair}>{from} → {to}</Text>
-
-      <Notice text={notice} />
-      <Notice text={error} kind="error" />
-
-      {loading && !history ? (
-        <View style={styles.loading}>
-          <ActivityIndicator />
-          <Text style={styles.muted}>Загрузка курсов {progress}</Text>
-        </View>
-      ) : from === to ? (
-        <Notice text="Выберите на экране «Конвертер» две разные валюты." />
-      ) : !stats ? (
-        <View style={card}><Text style={styles.muted}>Нет данных за выбранный период.</Text></View>
-      ) : (
-        <>
-          <View style={card}>
-            <View style={styles.trendRow}>
-              <Text style={[styles.trend, { color: trendColor }]}>
-                {stats.trend === 'up' ? '▲' : stats.trend === 'down' ? '▼' : '■'} {TREND_LABEL[stats.trend]}
-              </Text>
-              <Text style={[styles.pct, { color: trendColor }]}>
-                {sign(stats.pctChange)}{formatAmount(Math.abs(stats.pctChange), 2)} %
-              </Text>
+      <ScreenHeader title={title} subtitle={`Курс ${from} → ${to} за последние ${days} дней`} />
+      <View style={styles.content}>
+        {loading && !history ? (
+          <View style={[card, styles.loading]}>
+            <ActivityIndicator color={colors.primary} />
+            <Text style={styles.muted} testID="progress">Загрузка курсов {progress}</Text>
+          </View>
+        ) : from === to ? (
+          <Notice text="Выберите на экране «Конвертер» две разные валюты." />
+        ) : !stats ? (
+          <>
+            <Notice text={notice} />
+            <Notice text={error} kind="error" />
+            <View style={card}><Text style={styles.muted} testID="no-data">Нет данных за выбранный период.</Text></View>
+          </>
+        ) : (
+          <>
+            <View style={card}>
+              <View style={styles.trendRow}>
+                <View>
+                  <Text style={styles.muted}>Сейчас</Text>
+                  <Text style={styles.current} testID="current">{formatAmount(stats.last.value, 4)}</Text>
+                </View>
+                <View style={[styles.trendPill, { backgroundColor: TREND_SOFT[stats.trend] }]} testID="trend">
+                  <Text style={[styles.trendText, { color: trendColor }]}>
+                    {TREND_ICON[stats.trend]} {TREND_LABEL[stats.trend]}
+                  </Text>
+                  <Text style={[styles.trendPct, { color: trendColor }]} testID="pct">
+                    {sign(stats.pctChange)}{formatAmount(Math.abs(stats.pctChange), 2)} %
+                  </Text>
+                </View>
+              </View>
+              <LineChart points={points} color={trendColor} />
             </View>
-            <LineChart points={points} color={trendColor} />
-          </View>
 
-          <View style={[card, styles.grid]}>
-            <Stat label="Минимум" value={formatAmount(stats.min.value, 4)} hint={stats.min.date} />
-            <Stat label="Максимум" value={formatAmount(stats.max.value, 4)} hint={stats.max.date} />
-            <Stat label="Среднее" value={formatAmount(stats.avg, 4)} hint={`${stats.count} дн.`} />
-            <Stat label="Изменение" value={`${sign(stats.absChange)}${formatAmount(Math.abs(stats.absChange), 4)}`}
-              hint={`${stats.first.date} → ${stats.last.date}`} />
-          </View>
+            <Notice text={notice} />
+            <Notice text={error} kind="error" />
 
-          <Text style={styles.source}>
-            1 {from} в {to}. Источник: {SOURCE_NAME}. Данные на {lastDate}.
-          </Text>
-        </>
-      )}
+            <View style={styles.grid}>
+              <Stat id="min" label="Минимум" value={formatAmount(stats.min.value, 4)} hint={stats.min.date} accent={colors.down} />
+              <Stat id="max" label="Максимум" value={formatAmount(stats.max.value, 4)} hint={stats.max.date} accent={colors.up} />
+              <Stat id="avg" label="Среднее" value={formatAmount(stats.avg, 4)} hint={`${stats.count} дн.`} accent={colors.primary} />
+              <Stat id="change" label="Изменение"
+                value={`${sign(stats.absChange)}${formatAmount(Math.abs(stats.absChange), 4)}`}
+                hint={`${stats.first.date} → ${stats.last.date}`} accent={trendColor} />
+            </View>
+
+            <Text style={styles.source} testID="analytics-source">
+              1 {from} в {to}. Источник: {SOURCE_NAME}. Данные на {lastDate}.
+            </Text>
+          </>
+        )}
+      </View>
     </ScrollView>
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
+function Stat({ id, label, value, hint, accent }: { id: string; label: string; value: string; hint: string; accent: string }) {
   return (
-    <View style={styles.stat}>
+    <View style={[card, styles.stat]} testID={`stat-${id}`}>
+      <View style={[styles.statBar, { backgroundColor: accent }]} />
       <Text style={styles.statLabel}>{label}</Text>
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statHint}>{hint}</Text>
@@ -107,18 +123,20 @@ function Stat({ label, value, hint }: { label: string; value: string; hint: stri
 }
 
 const styles = StyleSheet.create({
-  content: { padding: 16, gap: 12 },
-  h1: { fontSize: 22, fontWeight: '700', color: colors.text },
-  pair: { fontSize: 16, color: colors.muted, marginTop: -8 },
+  scroll: { paddingBottom: 24 },
+  content: { paddingHorizontal: 16, marginTop: -20, gap: 12 },
   loading: { alignItems: 'center', padding: 32, gap: 8 },
-  muted: { color: colors.muted },
-  trendRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  trend: { fontSize: 18, fontWeight: '700' },
-  pct: { fontSize: 18, fontWeight: '700' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 },
-  stat: { width: '50%' },
+  muted: { color: colors.muted, fontSize: 13 },
+  trendRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  current: { fontSize: 26, fontWeight: '800', color: colors.text },
+  trendPill: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 6, alignItems: 'flex-end' },
+  trendText: { fontSize: 14, fontWeight: '700' },
+  trendPct: { fontSize: 18, fontWeight: '800' },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  stat: { flexBasis: '47%', flexGrow: 1, paddingLeft: 20, overflow: 'hidden' },
+  statBar: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 4 },
   statLabel: { color: colors.muted, fontSize: 13 },
-  statValue: { color: colors.text, fontSize: 18, fontWeight: '600', marginTop: 2 },
+  statValue: { color: colors.text, fontSize: 19, fontWeight: '700', marginTop: 2 },
   statHint: { color: colors.muted, fontSize: 12, marginTop: 2 },
   source: { color: colors.muted, fontSize: 12, textAlign: 'center' },
 });

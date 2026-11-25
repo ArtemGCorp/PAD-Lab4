@@ -5,6 +5,7 @@ import {
 
 import { CurrencyPicker } from '../components/CurrencyPicker';
 import { Notice } from '../components/Notice';
+import { ScreenHeader } from '../components/ScreenHeader';
 import { SOURCE_NAME } from '../lib/bnm';
 import { convert, formatAmount, pairRate, parseAmount } from '../lib/money';
 import { useAppState } from '../state';
@@ -14,7 +15,7 @@ export function ConverterScreen() {
   const s = useAppState();
   const [amount, setAmount] = useState('');
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{ text: string; rate: string } | null>(null);
+  const [result, setResult] = useState<{ from: string; to: string; rate: string } | null>(null);
 
   const table = s.latest?.table;
   const names = useMemo(
@@ -40,7 +41,8 @@ export function ConverterScreen() {
     }
     setError(null);
     setResult({
-      text: `${formatAmount(parsed.value)} ${from} = ${formatAmount(value)} ${to}`,
+      from: `${formatAmount(parsed.value)} ${from}`,
+      to: `${formatAmount(value)} ${to}`,
       rate: `1 ${from} = ${formatAmount(rate, 4)} ${to}`,
     });
   };
@@ -53,97 +55,124 @@ export function ConverterScreen() {
 
   return (
     <ScrollView
-      contentContainerStyle={styles.content}
+      contentContainerStyle={styles.scroll}
       keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={s.loadingLatest && !!s.latest} onRefresh={s.reloadLatest} />}
     >
-      <Notice text={s.latest?.notice} />
-      <Notice text={s.latestError} kind="error" />
+      <ScreenHeader title="Конвертер валют" subtitle="Официальный курс Национального банка Молдовы" />
+      <View style={styles.content}>
+        <View style={card}>
+          <Text style={styles.label}>Сумма</Text>
+          <TextInput
+            testID="amount"
+            value={amount}
+            onChangeText={(t) => {
+              setAmount(t);
+              setError(null);
+            }}
+            placeholder="Например, 100 или 12,50"
+            placeholderTextColor={colors.disabled}
+            keyboardType="decimal-pad"
+            style={[styles.input, error ? styles.inputError : null]}
+            returnKeyType="done"
+            onSubmitEditing={() => canConvert && doConvert()}
+          />
+          {error && <Text style={styles.error} testID="amount-error">{error}</Text>}
 
-      <View style={card}>
-        <Text style={styles.label}>Сумма</Text>
-        <TextInput
-          testID="amount"
-          value={amount}
-          onChangeText={(t) => {
-            setAmount(t);
-            setError(null);
-          }}
-          placeholder="Например, 100 или 12,50"
-          keyboardType="decimal-pad"
-          style={[styles.input, error && { borderColor: colors.errorText }]}
-          returnKeyType="done"
-          onSubmitEditing={() => canConvert && doConvert()}
-        />
-        {error && <Text style={styles.error}>{error}</Text>}
+          <View style={styles.pickers}>
+            <CurrencyPicker label="Из валюты" value={s.from} options={s.currencies} names={names} testID="from"
+              onChange={(c) => { s.setFrom(c); setResult(null); }} />
+            <Pressable onPress={onSwap} style={styles.swap} accessibilityLabel="Поменять валюты местами"
+              hitSlop={8} testID="swap">
+              <Text style={styles.swapText}>⇄</Text>
+            </Pressable>
+            <CurrencyPicker label="В валюту" value={s.to} options={s.currencies} names={names} testID="to"
+              onChange={(c) => { s.setTo(c); setResult(null); }} />
+          </View>
 
-        <View style={styles.pickers}>
-          <CurrencyPicker label="Из валюты" value={s.from} options={s.currencies} names={names}
-            onChange={(c) => { s.setFrom(c); setResult(null); }} />
-          <Pressable onPress={onSwap} style={styles.swap} accessibilityLabel="Поменять валюты местами" hitSlop={8}>
-            <Text style={styles.swapText}>⇄</Text>
+          <Pressable
+            testID="convert"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canConvert }}
+            disabled={!canConvert}
+            onPress={() => doConvert()}
+            style={({ pressed }) => [styles.button, !canConvert && styles.buttonDisabled, pressed && { opacity: 0.85 }]}
+          >
+            <Text style={styles.buttonText}>Конвертировать</Text>
           </Pressable>
-          <CurrencyPicker label="В валюту" value={s.to} options={s.currencies} names={names}
-            onChange={(c) => { s.setTo(c); setResult(null); }} />
         </View>
 
-        <Pressable
-          testID="convert"
-          disabled={!canConvert}
-          onPress={() => doConvert()}
-          style={[styles.button, !canConvert && { backgroundColor: colors.disabled }]}
-        >
-          <Text style={styles.buttonText}>Конвертировать</Text>
-        </Pressable>
-      </View>
+        <Notice text={s.latest?.notice} />
+        <Notice text={s.latestError} kind="error" />
 
-      {result && (
-        <View style={[card, styles.resultCard]}>
-          <Text style={styles.result}>{result.text}</Text>
-          <Text style={styles.rate}>{result.rate}</Text>
-        </View>
-      )}
-
-      <View style={styles.info}>
-        {s.loadingLatest && !s.latest ? (
-          <ActivityIndicator />
-        ) : table ? (
-          <>
-            <Text style={styles.infoText}>Курс на {table.date}</Text>
-            <Text style={styles.infoText}>Источник: {SOURCE_NAME}</Text>
-            {s.latest?.fromCache && s.latest.savedAt && (
-              <Text style={styles.infoText}>
-                Сохранено: {new Date(s.latest.savedAt).toLocaleString('ru-RU')}
-              </Text>
-            )}
-          </>
-        ) : (
-          <Pressable onPress={s.reloadLatest} style={styles.retry}>
-            <Text style={{ color: colors.primary }}>Повторить загрузку</Text>
-          </Pressable>
+        {result && (
+          <View style={[card, styles.resultCard]} testID="result">
+            <Text style={styles.resultFrom}>{result.from} =</Text>
+            <Text style={styles.resultTo} testID="result-value">{result.to}</Text>
+            <View style={styles.rateChip}>
+              <Text style={styles.rateText} testID="result-rate">{result.rate}</Text>
+            </View>
+          </View>
         )}
+
+        <View style={[card, styles.info]}>
+          {s.loadingLatest && !s.latest ? (
+            <ActivityIndicator color={colors.primary} />
+          ) : table ? (
+            <>
+              <Row label="Дата курса" value={table.date} testID="rate-date" />
+              <Row label="Источник" value={SOURCE_NAME} testID="source" />
+              {s.latest?.fromCache && s.latest.savedAt && (
+                <Row label="Сохранено" value={new Date(s.latest.savedAt).toLocaleString('ru-RU')} testID="saved-at" />
+              )}
+            </>
+          ) : (
+            <Pressable onPress={s.reloadLatest} style={styles.retry} testID="retry">
+              <Text style={{ color: colors.primary, fontWeight: '600' }}>Повторить загрузку</Text>
+            </Pressable>
+          )}
+        </View>
       </View>
     </ScrollView>
   );
 }
 
+function Row({ label, value, testID }: { label: string; value: string; testID: string }) {
+  return (
+    <View style={styles.row}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={styles.rowValue} testID={testID}>{value}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  content: { padding: 16 },
-  label: { color: colors.muted, fontSize: 13, marginBottom: 6 },
+  scroll: { paddingBottom: 24 },
+  content: { paddingHorizontal: 16, marginTop: -20, gap: 12 },
+  label: { color: colors.muted, fontSize: 13, marginBottom: 6, fontWeight: '600' },
   input: {
-    borderWidth: 1, borderColor: colors.border, borderRadius: 10, paddingHorizontal: 14,
-    paddingVertical: 12, fontSize: 20, color: colors.text,
+    borderWidth: 1, borderColor: colors.border, borderRadius: 12, paddingHorizontal: 14,
+    paddingVertical: 12, fontSize: 22, fontWeight: '600', color: colors.text, backgroundColor: colors.bg,
   },
+  inputError: { borderColor: colors.errorText },
   error: { color: colors.errorText, marginTop: 6 },
   pickers: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, marginTop: 16 },
-  swap: { paddingHorizontal: 6, paddingBottom: 10 },
-  swapText: { fontSize: 26, color: colors.primary },
-  button: { marginTop: 18, backgroundColor: colors.primary, borderRadius: 10, paddingVertical: 14, alignItems: 'center' },
-  buttonText: { color: colors.primaryText, fontSize: 17, fontWeight: '600' },
-  resultCard: { marginTop: 16, alignItems: 'center' },
-  result: { fontSize: 22, fontWeight: '700', color: colors.text, textAlign: 'center' },
-  rate: { marginTop: 6, color: colors.muted },
-  info: { marginTop: 16, alignItems: 'center', gap: 2 },
-  infoText: { color: colors.muted, fontSize: 13 },
-  retry: { padding: 8 },
+  swap: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft,
+    alignItems: 'center', justifyContent: 'center', marginBottom: 8,
+  },
+  swapText: { fontSize: 20, color: colors.primary, fontWeight: '700' },
+  button: { marginTop: 18, backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 15, alignItems: 'center' },
+  buttonDisabled: { backgroundColor: colors.disabled },
+  buttonText: { color: colors.primaryText, fontSize: 17, fontWeight: '700' },
+  resultCard: { alignItems: 'center', paddingVertical: 20 },
+  resultFrom: { fontSize: 16, color: colors.muted },
+  resultTo: { fontSize: 30, fontWeight: '800', color: colors.primary, marginTop: 4, textAlign: 'center' },
+  rateChip: { marginTop: 10, backgroundColor: colors.primarySoft, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 },
+  rateText: { color: colors.primary, fontWeight: '600', fontSize: 13 },
+  info: { gap: 8 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12 },
+  rowLabel: { color: colors.muted, fontSize: 13 },
+  rowValue: { color: colors.text, fontSize: 13, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
+  retry: { padding: 8, alignItems: 'center' },
 });
