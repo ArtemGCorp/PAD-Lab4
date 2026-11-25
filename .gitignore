@@ -7,3 +7,6 @@ android/
 *.log
 .DS_Store
 coverage/
+dist-web/
+test-results/
+playwright-report/
