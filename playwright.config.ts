@@ -14,6 +14,8 @@ export default defineConfig({
     channel: 'chrome',
     ...devices['Pixel 7'],
     trace: 'retain-on-failure',
+    // SLOWMO=600 npm run test:e2e:headed — pause between actions to watch them.
+    launchOptions: { slowMo: Number(process.env.SLOWMO ?? 0) },
     screenshot: 'only-on-failure',
   },
   projects: [{ name: 'mobile-chrome' }],
