@@ -21,20 +21,24 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AppStateProvider>
-        <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
-          <StatusBar style="dark" />
+        <SafeAreaView style={styles.root} edges={['top']}>
+          <StatusBar style="light" />
           <View style={styles.body}>
             {tab === 'convert' && <ConverterScreen />}
             {tab === 'week' && <AnalyticsScreen key="week" days={7} title="Сравнение за неделю" />}
             {tab === 'month' && <AnalyticsScreen key="month" days={30} title="Сравнение за месяц" />}
           </View>
+        </SafeAreaView>
+        <SafeAreaView edges={['bottom']} style={styles.tabsWrap}>
           <View style={styles.tabs} accessibilityRole="tablist">
             {TABS.map((t) => {
               const active = t.key === tab;
               return (
-                <Pressable key={t.key} style={styles.tab} onPress={() => setTab(t.key)}
+                <Pressable key={t.key} style={styles.tab} onPress={() => setTab(t.key)} testID={`tab-${t.key}`}
                   accessibilityRole="tab" accessibilityState={{ selected: active }}>
-                  <Text style={[styles.icon, active && styles.active]}>{t.icon}</Text>
+                  <View style={[styles.pill, active && styles.pillActive]}>
+                    <Text style={[styles.icon, active && styles.active]}>{t.icon}</Text>
+                  </View>
                   <Text style={[styles.tabLabel, active && styles.active]}>{t.label}</Text>
                 </Pressable>
               );
@@ -47,14 +51,17 @@ export default function App() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  body: { flex: 1 },
+  root: { flex: 1, backgroundColor: colors.header },
+  body: { flex: 1, backgroundColor: colors.bg },
+  tabsWrap: { backgroundColor: colors.card },
   tabs: {
     flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border,
-    backgroundColor: colors.card,
+    backgroundColor: colors.card, paddingTop: 6, paddingBottom: 4,
   },
-  tab: { flex: 1, alignItems: 'center', paddingVertical: 8 },
-  icon: { fontSize: 18, fontWeight: '700', color: colors.muted },
-  tabLabel: { fontSize: 12, color: colors.muted, marginTop: 2 },
+  tab: { flex: 1, alignItems: 'center', gap: 2 },
+  pill: { minWidth: 56, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
+  pillActive: { backgroundColor: colors.primarySoft },
+  icon: { fontSize: 16, fontWeight: '800', color: colors.muted },
+  tabLabel: { fontSize: 12, color: colors.muted, fontWeight: '600' },
   active: { color: colors.primary },
 });
